@@ -1,24 +1,19 @@
-from flask import Flask, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routes import register_routes
 
-app = Flask(__name__)
-CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-db = SQLAlchemy(app)
+app = FastAPI(
+    title="Whisky Record API",
+    version="1.0.0",
+    description="ウイスキー記録アプリのバックエンド API。/docs で Swagger UI を確認できる。",
+)
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok", "message": "Flask is running!"})
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.route("/health/db")
-def health_db():
-    try:
-        db.session.execute(db.text("SELECT 1"))
-        return jsonify({"status": "ok", "message": "DB connected!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(debug=True)
+register_routes(app)
