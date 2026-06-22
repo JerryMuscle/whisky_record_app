@@ -3,8 +3,6 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import SessionImageUpload from "@/components/SessionImageUpload";
-import Label from "@/components/Label";
-import { input, select } from "@/lib/styles";
 
 const SERVING_STYLES = ["ストレート", "ロック", "水割り", "ハイボール", "その他"];
 const SITUATIONS = ["自宅", "バー", "イベント", "その他"];
@@ -18,6 +16,36 @@ const FLAVORS: { key: string; label: string }[] = [
 
 // TODO: APIから取得
 const MOCK_BOTTLE = { id: "1", name: "Laphroaig 10 Years" };
+const MOCK_SESSION = {
+  tasted_at: "2026-06-01",
+  rating: 4,
+  serving_style: "ストレート",
+  location: "自宅",
+  situation: "自宅",
+  memo: "スモーキーさが心地よく、後味に甘みが残る。ピートの香りが特徴的。",
+  want_again: true,
+  f_smoky: 5,
+  f_fruity: 2,
+  f_floral: 1,
+  f_spicy: 3,
+  f_woody: 2,
+  flavor_tags: ["ピーティー", "スモーキー"],
+};
+
+const inputClass =
+  "w-full rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition";
+
+const selectClass =
+  "w-full rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition";
+
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="block text-sm font-medium text-stone-700">
+      {children}
+      {required && <span className="ml-1 text-amber-600">*</span>}
+    </label>
+  );
+}
 
 function StarInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -68,22 +96,29 @@ function FlavorSlider({ label, value, onChange }: { label: string; value: number
   );
 }
 
-export default function NewSessionPage({
+export default function EditSessionPage({
   params,
 }: {
-  params: Promise<{ bottle_id: string }>;
+  params: Promise<{ bottle_id: string; session_id: string }>;
 }) {
-  const { bottle_id } = use(params);
-  const [tastedAt, setTastedAt] = useState("");
-  const [rating, setRating] = useState(0);
-  const [servingStyle, setServingStyle] = useState("");
-  const [location, setLocation] = useState("");
-  const [situation, setSituation] = useState("");
-  const [memo, setMemo] = useState("");
-  const [wantAgain, setWantAgain] = useState<boolean | null>(null);
-  const [flavors, setFlavors] = useState({ f_smoky: 0, f_fruity: 0, f_floral: 0, f_spicy: 0, f_woody: 0 });
+  const { bottle_id, session_id } = use(params);
+
+  const [tastedAt, setTastedAt] = useState(MOCK_SESSION.tasted_at);
+  const [rating, setRating] = useState(MOCK_SESSION.rating);
+  const [servingStyle, setServingStyle] = useState(MOCK_SESSION.serving_style);
+  const [location, setLocation] = useState(MOCK_SESSION.location);
+  const [situation, setSituation] = useState(MOCK_SESSION.situation);
+  const [memo, setMemo] = useState(MOCK_SESSION.memo);
+  const [wantAgain, setWantAgain] = useState<boolean | null>(MOCK_SESSION.want_again);
+  const [flavors, setFlavors] = useState({
+    f_smoky: MOCK_SESSION.f_smoky,
+    f_fruity: MOCK_SESSION.f_fruity,
+    f_floral: MOCK_SESSION.f_floral,
+    f_spicy: MOCK_SESSION.f_spicy,
+    f_woody: MOCK_SESSION.f_woody,
+  });
   const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(MOCK_SESSION.flavor_tags);
   const [sessionImages, setSessionImages] = useState<File[]>([]);
 
   const addTag = () => {
@@ -95,7 +130,7 @@ export default function NewSessionPage({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: API連携
-    alert("送信（API連携は後で実装）");
+    alert("更新（API連携は後で実装）");
   };
 
   return (
@@ -109,10 +144,10 @@ export default function NewSessionPage({
             {MOCK_BOTTLE.name}
           </Link>
           <span>/</span>
-          <span className="text-stone-600">セッション追加</span>
+          <span className="text-stone-600">セッション編集</span>
         </nav>
-        <h1 className="text-2xl font-semibold text-stone-800">セッション追加</h1>
-        <p className="mt-1 text-sm text-stone-500">{MOCK_BOTTLE.name} のテイスティング記録を追加します</p>
+        <h1 className="text-2xl font-semibold text-stone-800">セッション編集</h1>
+        <p className="mt-1 text-sm text-stone-500">{MOCK_BOTTLE.name} のテイスティング記録を編集します</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -125,12 +160,12 @@ export default function NewSessionPage({
                 type="date"
                 value={tastedAt}
                 onChange={(e) => setTastedAt(e.target.value)}
-                className={input}
+                className={inputClass}
               />
             </div>
             <div className="space-y-1.5">
               <Label>飲み方</Label>
-              <select value={servingStyle} onChange={(e) => setServingStyle(e.target.value)} className={select}>
+              <select value={servingStyle} onChange={(e) => setServingStyle(e.target.value)} className={selectClass}>
                 <option value="">選択してください</option>
                 {SERVING_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -145,7 +180,7 @@ export default function NewSessionPage({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>シチュエーション</Label>
-              <select value={situation} onChange={(e) => setSituation(e.target.value)} className={select}>
+              <select value={situation} onChange={(e) => setSituation(e.target.value)} className={selectClass}>
                 <option value="">選択してください</option>
                 {SITUATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -157,7 +192,7 @@ export default function NewSessionPage({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="例: 新宿のバー"
-                className={input}
+                className={inputClass}
               />
             </div>
           </div>
@@ -187,7 +222,7 @@ export default function NewSessionPage({
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                 placeholder="タグを入力してEnter"
-                className={input}
+                className={inputClass}
               />
               <button
                 type="button"
@@ -242,11 +277,23 @@ export default function NewSessionPage({
             <textarea
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
-              placeholder="テイスティングの感想など..."
               rows={4}
-              className={input}
+              className={inputClass}
             />
           </div>
+        </div>
+
+        {/* 削除ゾーン */}
+        <div className="bg-red-50 rounded-xl border border-red-200 p-5 space-y-2">
+          <p className="text-sm font-medium text-red-700">このセッションを削除</p>
+          <p className="text-xs text-red-500">削除したセッションは復元できません。</p>
+          <button
+            type="button"
+            className="mt-2 rounded-lg border border-red-300 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition"
+            onClick={() => alert("削除（API連携は後で実装）")}
+          >
+            このセッションを削除する
+          </button>
         </div>
 
         {/* 送信ボタン */}
@@ -261,7 +308,7 @@ export default function NewSessionPage({
             type="submit"
             className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
           >
-            記録を保存
+            変更を保存
           </button>
         </div>
       </form>

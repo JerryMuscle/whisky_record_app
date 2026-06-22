@@ -13,21 +13,24 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col border-r border-zinc-200 bg-white min-h-screen px-4 py-6">
-      <div className="mb-8 px-2">
-        <span className="text-lg font-semibold tracking-tight text-zinc-900">
-          Whisky Record
+    <aside className="w-56 shrink-0 flex flex-col bg-stone-800 min-h-screen px-4 py-6">
+      {/* ロゴ */}
+      <div className="mb-10 px-2">
+        <span className="text-lg font-semibold tracking-wide text-amber-100">
+          Whisky Notes
         </span>
       </div>
+
+      {/* ナビゲーション */}
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map(({ label, href }) => (
           <Link
             key={href}
             href={href}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               pathname.startsWith(href)
-                ? "bg-zinc-100 text-zinc-900"
-                : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                ? "bg-amber-700 text-white"
+                : "text-stone-400 hover:bg-stone-700 hover:text-stone-100"
             }`}
           >
             {label}
