@@ -1,10 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SessionImageUpload from "@/components/SessionImageUpload";
 import Label from "@/components/Label";
 import { input, select } from "@/lib/styles";
+import { useAuth } from "@/contexts/AuthContext";
+import { getBottle, createSession, createTag } from "@/lib/api";
+import type { Bottle } from "@/types";
 
 const SERVING_STYLES = ["ストレート", "ロック", "水割り", "ハイボール", "その他"];
 const SITUATIONS = ["自宅", "バー", "イベント", "その他"];
@@ -15,9 +19,6 @@ const FLAVORS: { key: string; label: string }[] = [
   { key: "f_spicy", label: "スパイシー" },
   { key: "f_woody", label: "ウッディー" },
 ];
-
-// TODO: APIから取得
-const MOCK_BOTTLE = { id: "1", name: "Laphroaig 10 Years" };
 
 function StarInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -74,6 +75,9 @@ export default function NewSessionPage({
   params: Promise<{ bottle_id: string }>;
 }) {
   const { bottle_id } = use(params);
+  const { token } = useAuth();
+  const router = useRouter();
+  const [bottle, setBottle] = useState<Bottle | null>(null);
   const [tastedAt, setTastedAt] = useState("");
   const [rating, setRating] = useState(0);
   const [servingStyle, setServingStyle] = useState("");
@@ -85,6 +89,12 @@ export default function NewSessionPage({
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [sessionImages, setSessionImages] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getBottle(token, bottle_id).then(setBottle).catch(() => router.push("/bottles"));
+  }, [token, bottle_id]);
 
   const addTag = () => {
     const t = tagInput.trim();
@@ -92,10 +102,39 @@ export default function NewSessionPage({
     setTagInput("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: API連携
-    alert("送信（API連携は後で実装）");
+    if (!tastedAt || rating === 0) {
+      setError("飲んだ日時と総合評価は必須です");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const tagIds: string[] = await Promise.all(
+        tags.map(async (tagName) => {
+          const tag = await createTag(token, tagName);
+          return tag.id;
+        })
+      );
+      await createSession(token, bottle_id, {
+        tasted_at: new Date(tastedAt).toISOString(),
+        rating,
+        serving_style: servingStyle || undefined,
+        location: location || undefined,
+        situation: situation || undefined,
+        memo: memo || undefined,
+        want_again: wantAgain ?? undefined,
+        ...flavors,
+        tag_ids: tagIds,
+      });
+      router.push(`/bottles/${bottle_id}`);
+    } catch (err) {
+      console.error(err);
+      setError("保存に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -106,13 +145,13 @@ export default function NewSessionPage({
           <Link href="/bottles" className="hover:text-stone-600 transition">記録一覧</Link>
           <span>/</span>
           <Link href={`/bottles/${bottle_id}`} className="hover:text-stone-600 transition">
-            {MOCK_BOTTLE.name}
+            {bottle?.name ?? "..."}
           </Link>
           <span>/</span>
           <span className="text-stone-600">セッション追加</span>
         </nav>
         <h1 className="text-2xl font-semibold text-stone-800">セッション追加</h1>
-        <p className="mt-1 text-sm text-stone-500">{MOCK_BOTTLE.name} のテイスティング記録を追加します</p>
+        <p className="mt-1 text-sm text-stone-500">{bottle?.name ?? ""} のテイスティング記録を追加します</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -249,6 +288,9 @@ export default function NewSessionPage({
           </div>
         </div>
 
+        {/* エラー */}
+        {error && <p className="text-sm text-red-600 text-right">{error}</p>}
+
         {/* 送信ボタン */}
         <div className="flex justify-end gap-3">
           <Link
@@ -259,9 +301,10 @@ export default function NewSessionPage({
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
+            disabled={submitting}
+            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
           >
-            記録を保存
+            {submitting ? "保存中..." : "記録を保存"}
           </button>
         </div>
       </form>

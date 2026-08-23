@@ -1,24 +1,15 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Label from "@/components/Label";
 import { input, select } from "@/lib/styles";
+import { useAuth } from "@/contexts/AuthContext";
+import { getBottle, updateBottle, deleteBottle } from "@/lib/api";
 
 const REGIONS = ["スコッチ", "バーボン", "ジャパニーズ", "アイリッシュ", "カナディアン", "その他"];
 const BOTTLE_TYPES = ["シングルモルト", "ブレンデッド", "シングルグレーン", "バーボン", "ライ", "その他"];
-
-// TODO: APIから取得
-const MOCK_BOTTLE = {
-  id: "1",
-  name: "Laphroaig 10 Years",
-  distillery: "Laphroaig",
-  region: "スコッチ",
-  bottle_type: "シングルモルト",
-  abv: "40",
-  price: "5500",
-  photo_url: null,
-};
 
 export default function EditBottlePage({
   params,
@@ -26,17 +17,66 @@ export default function EditBottlePage({
   params: Promise<{ bottle_id: string }>;
 }) {
   const { bottle_id } = use(params);
-  const [name, setName] = useState(MOCK_BOTTLE.name);
-  const [distillery, setDistillery] = useState(MOCK_BOTTLE.distillery);
-  const [region, setRegion] = useState(MOCK_BOTTLE.region);
-  const [bottleType, setBottleType] = useState(MOCK_BOTTLE.bottle_type);
-  const [abv, setAbv] = useState(MOCK_BOTTLE.abv);
-  const [price, setPrice] = useState(MOCK_BOTTLE.price);
+  const { token } = useAuth();
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [name, setName] = useState("");
+  const [distillery, setDistillery] = useState("");
+  const [region, setRegion] = useState("");
+  const [bottleType, setBottleType] = useState("");
+  const [abv, setAbv] = useState("");
+  const [price, setPrice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const bottle = await getBottle(token, bottle_id);
+        setName(bottle.name);
+        setDistillery(bottle.distillery);
+        setRegion(bottle.region);
+        setBottleType(bottle.bottle_type ?? "");
+        setAbv(bottle.abv != null ? String(bottle.abv) : "");
+        setPrice(bottle.price != null ? String(bottle.price) : "");
+      } catch (e) {
+        console.error(e);
+        router.push("/bottles");
+      }
+    })();
+  }, [token, bottle_id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: API連携
-    alert("更新（API連携は後で実装）");
+    setSubmitting(true);
+    setError(null);
+    try {
+      await updateBottle(token, bottle_id, {
+        name,
+        distillery,
+        region,
+        bottle_type: bottleType || undefined,
+        abv: abv ? Number(abv) : undefined,
+        price: price ? Number(price) : undefined,
+      });
+      router.push(`/bottles/${bottle_id}`);
+    } catch (err) {
+      console.error(err);
+      setError("更新に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("このボトルを削除しますか？関連するテイスティング記録もすべて削除されます。")) return;
+    try {
+      await deleteBottle(token, bottle_id);
+      router.push("/bottles");
+    } catch (err) {
+      console.error(err);
+      setError("削除に失敗しました。");
+    }
   };
 
   return (
@@ -142,14 +182,14 @@ export default function EditBottlePage({
           <button
             type="button"
             className="mt-2 rounded-lg border border-red-300 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition"
-            onClick={() => {
-              // TODO: 削除確認ダイアログ＋API連携
-              alert("削除（API連携は後で実装）");
-            }}
+            onClick={handleDelete}
           >
             このボトルを削除する
           </button>
         </div>
+
+        {/* エラー */}
+        {error && <p className="text-sm text-red-600 text-right">{error}</p>}
 
         {/* 送信ボタン */}
         <div className="flex justify-end gap-3">
@@ -161,9 +201,10 @@ export default function EditBottlePage({
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
+            disabled={submitting}
+            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
           >
-            変更を保存
+            {submitting ? "保存中..." : "変更を保存"}
           </button>
         </div>
       </form>

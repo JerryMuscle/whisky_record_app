@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SessionImageUpload from "@/components/SessionImageUpload";
 import Label from "@/components/Label";
 import { input, select } from "@/lib/styles";
+import { useAuth } from "@/contexts/AuthContext";
+import { createBottle, createSession, createTag } from "@/lib/api";
 
 const REGIONS = ["スコッチ", "バーボン", "ジャパニーズ", "アイリッシュ", "カナディアン", "その他"];
 const BOTTLE_TYPES = ["シングルモルト", "ブレンデッド", "シングルグレーン", "バーボン", "ライ", "その他"];
@@ -82,6 +85,9 @@ function FlavorSlider({
 }
 
 export default function NewBottlePage() {
+  const { token } = useAuth();
+  const router = useRouter();
+
   // ボトル情報
   const [name, setName] = useState("");
   const [distillery, setDistillery] = useState("");
@@ -102,6 +108,8 @@ export default function NewBottlePage() {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [sessionImages, setSessionImages] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addTag = () => {
     const t = tagInput.trim();
@@ -113,10 +121,54 @@ export default function NewBottlePage() {
 
   const removeTag = (tag: string) => setTags(tags.filter((t) => t !== tag));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: API連携
-    alert("送信（API連携は後で実装）");
+    if (!name || !distillery || !region) {
+      setError("銘柄名・蒸留所・産地は必須です");
+      return;
+    }
+    if (!tastedAt || rating === 0) {
+      setError("飲んだ日時と総合評価は必須です");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const bottle = await createBottle(token, {
+        name,
+        distillery,
+        region,
+        bottle_type: bottleType || undefined,
+        abv: abv ? Number(abv) : undefined,
+        price: price ? Number(price) : undefined,
+      });
+
+      const tagIds: string[] = await Promise.all(
+        tags.map(async (tagName) => {
+          const tag = await createTag(token, tagName);
+          return tag.id;
+        })
+      );
+
+      await createSession(token, bottle.id, {
+        tasted_at: new Date(tastedAt).toISOString(),
+        rating,
+        serving_style: servingStyle || undefined,
+        location: location || undefined,
+        situation: situation || undefined,
+        memo: memo || undefined,
+        want_again: wantAgain ?? undefined,
+        ...flavors,
+        tag_ids: tagIds,
+      });
+
+      router.push(`/bottles/${bottle.id}`);
+    } catch (err) {
+      console.error(err);
+      setError("保存に失敗しました。入力内容を確認してください。");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -352,6 +404,11 @@ export default function NewBottlePage() {
           </div>
         </section>
 
+        {/* エラー */}
+        {error && (
+          <p className="text-sm text-red-600 text-right">{error}</p>
+        )}
+
         {/* 送信ボタン */}
         <div className="flex justify-end gap-3 pt-2">
           <Link
@@ -362,9 +419,10 @@ export default function NewBottlePage() {
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
+            disabled={submitting}
+            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
           >
-            記録を保存
+            {submitting ? "保存中..." : "記録を保存"}
           </button>
         </div>
       </form>

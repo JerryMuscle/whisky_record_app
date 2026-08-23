@@ -1,8 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SessionImageUpload from "@/components/SessionImageUpload";
+import Label from "@/components/Label";
+import { input as inputClass, select as selectClass } from "@/lib/styles";
+import { useAuth } from "@/contexts/AuthContext";
+import { getBottle, getSession, updateSession, deleteSession, createTag } from "@/lib/api";
+import type { Bottle, TastingSession } from "@/types";
 
 const SERVING_STYLES = ["ストレート", "ロック", "水割り", "ハイボール", "その他"];
 const SITUATIONS = ["自宅", "バー", "イベント", "その他"];
@@ -13,39 +19,6 @@ const FLAVORS: { key: string; label: string }[] = [
   { key: "f_spicy", label: "スパイシー" },
   { key: "f_woody", label: "ウッディー" },
 ];
-
-// TODO: APIから取得
-const MOCK_BOTTLE = { id: "1", name: "Laphroaig 10 Years" };
-const MOCK_SESSION = {
-  tasted_at: "2026-06-01",
-  rating: 4,
-  serving_style: "ストレート",
-  location: "自宅",
-  situation: "自宅",
-  memo: "スモーキーさが心地よく、後味に甘みが残る。ピートの香りが特徴的。",
-  want_again: true,
-  f_smoky: 5,
-  f_fruity: 2,
-  f_floral: 1,
-  f_spicy: 3,
-  f_woody: 2,
-  flavor_tags: ["ピーティー", "スモーキー"],
-};
-
-const inputClass =
-  "w-full rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition";
-
-const selectClass =
-  "w-full rounded-lg border border-stone-300 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition";
-
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
-  return (
-    <label className="block text-sm font-medium text-stone-700">
-      {children}
-      {required && <span className="ml-1 text-amber-600">*</span>}
-    </label>
-  );
-}
 
 function StarInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -102,24 +75,53 @@ export default function EditSessionPage({
   params: Promise<{ bottle_id: string; session_id: string }>;
 }) {
   const { bottle_id, session_id } = use(params);
+  const { token } = useAuth();
+  const router = useRouter();
 
-  const [tastedAt, setTastedAt] = useState(MOCK_SESSION.tasted_at);
-  const [rating, setRating] = useState(MOCK_SESSION.rating);
-  const [servingStyle, setServingStyle] = useState(MOCK_SESSION.serving_style);
-  const [location, setLocation] = useState(MOCK_SESSION.location);
-  const [situation, setSituation] = useState(MOCK_SESSION.situation);
-  const [memo, setMemo] = useState(MOCK_SESSION.memo);
-  const [wantAgain, setWantAgain] = useState<boolean | null>(MOCK_SESSION.want_again);
-  const [flavors, setFlavors] = useState({
-    f_smoky: MOCK_SESSION.f_smoky,
-    f_fruity: MOCK_SESSION.f_fruity,
-    f_floral: MOCK_SESSION.f_floral,
-    f_spicy: MOCK_SESSION.f_spicy,
-    f_woody: MOCK_SESSION.f_woody,
-  });
+  const [bottle, setBottle] = useState<Bottle | null>(null);
+  const [tastedAt, setTastedAt] = useState("");
+  const [rating, setRating] = useState(0);
+  const [servingStyle, setServingStyle] = useState("");
+  const [location, setLocation] = useState("");
+  const [situation, setSituation] = useState("");
+  const [memo, setMemo] = useState("");
+  const [wantAgain, setWantAgain] = useState<boolean | null>(null);
+  const [flavors, setFlavors] = useState({ f_smoky: 0, f_fruity: 0, f_floral: 0, f_spicy: 0, f_woody: 0 });
   const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>(MOCK_SESSION.flavor_tags);
+  const [tags, setTags] = useState<string[]>([]);
   const [sessionImages, setSessionImages] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [b, s] = await Promise.all([
+          getBottle(token, bottle_id),
+          getSession(token, session_id),
+        ]);
+        setBottle(b);
+        setTastedAt(s.tasted_at.slice(0, 10));
+        setRating(s.rating);
+        setServingStyle(s.serving_style ?? "");
+        setLocation(s.location ?? "");
+        setSituation(s.situation ?? "");
+        setMemo(s.memo ?? "");
+        setWantAgain(s.want_again ?? null);
+        setFlavors({
+          f_smoky: s.f_smoky ?? 0,
+          f_fruity: s.f_fruity ?? 0,
+          f_floral: s.f_floral ?? 0,
+          f_spicy: s.f_spicy ?? 0,
+          f_woody: s.f_woody ?? 0,
+        });
+        setTags(s.flavor_tags.map((t) => t.name));
+      } catch (e) {
+        console.error(e);
+        router.push(`/bottles/${bottle_id}`);
+      }
+    })();
+  }, [token, bottle_id, session_id]);
 
   const addTag = () => {
     const t = tagInput.trim();
@@ -127,10 +129,46 @@ export default function EditSessionPage({
     setTagInput("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: API連携
-    alert("更新（API連携は後で実装）");
+    setSubmitting(true);
+    setError(null);
+    try {
+      const tagIds: string[] = await Promise.all(
+        tags.map(async (tagName) => {
+          const tag = await createTag(token, tagName);
+          return tag.id;
+        })
+      );
+      await updateSession(token, session_id, {
+        tasted_at: new Date(tastedAt).toISOString(),
+        rating,
+        serving_style: servingStyle || undefined,
+        location: location || undefined,
+        situation: situation || undefined,
+        memo: memo || undefined,
+        want_again: wantAgain ?? undefined,
+        ...flavors,
+        tag_ids: tagIds,
+      });
+      router.push(`/bottles/${bottle_id}`);
+    } catch (err) {
+      console.error(err);
+      setError("更新に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("このセッションを削除しますか？")) return;
+    try {
+      await deleteSession(token, session_id);
+      router.push(`/bottles/${bottle_id}`);
+    } catch (err) {
+      console.error(err);
+      setError("削除に失敗しました。");
+    }
   };
 
   return (
@@ -141,13 +179,13 @@ export default function EditSessionPage({
           <Link href="/bottles" className="hover:text-stone-600 transition">記録一覧</Link>
           <span>/</span>
           <Link href={`/bottles/${bottle_id}`} className="hover:text-stone-600 transition">
-            {MOCK_BOTTLE.name}
+            {bottle?.name ?? "..."}
           </Link>
           <span>/</span>
           <span className="text-stone-600">セッション編集</span>
         </nav>
         <h1 className="text-2xl font-semibold text-stone-800">セッション編集</h1>
-        <p className="mt-1 text-sm text-stone-500">{MOCK_BOTTLE.name} のテイスティング記録を編集します</p>
+        <p className="mt-1 text-sm text-stone-500">{bottle?.name ?? ""} のテイスティング記録を編集します</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -290,11 +328,14 @@ export default function EditSessionPage({
           <button
             type="button"
             className="mt-2 rounded-lg border border-red-300 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition"
-            onClick={() => alert("削除（API連携は後で実装）")}
+            onClick={handleDelete}
           >
             このセッションを削除する
           </button>
         </div>
+
+        {/* エラー */}
+        {error && <p className="text-sm text-red-600 text-right">{error}</p>}
 
         {/* 送信ボタン */}
         <div className="flex justify-end gap-3">
@@ -306,9 +347,10 @@ export default function EditSessionPage({
           </Link>
           <button
             type="submit"
-            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
+            disabled={submitting}
+            className="rounded-lg bg-amber-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
           >
-            変更を保存
+            {submitting ? "保存中..." : "変更を保存"}
           </button>
         </div>
       </form>

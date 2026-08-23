@@ -6,7 +6,7 @@ from .tags import router as tags_router
 
 
 def register_routes(app: FastAPI) -> None:
-    app.include_router(users_router, prefix="/api")
-    app.include_router(bottles_router, prefix="/api")
-    app.include_router(sessions_router, prefix="/api")
-    app.include_router(tags_router, prefix="/api")
+    app.include_router(users_router)
+    app.include_router(bottles_router)
+    app.include_router(sessions_router)
+    app.include_router(tags_router)
