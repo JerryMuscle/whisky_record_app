@@ -88,6 +88,34 @@ export function confirmForgotPassword(
   });
 }
 
+export function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const user = userPool.getCurrentUser();
+    if (!user) return reject(new Error("ログインしていません"));
+    user.getSession((err: Error | null) => {
+      if (err) return reject(err);
+      user.changePassword(oldPassword, newPassword, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  });
+}
+
+export function deleteUser(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const user = userPool.getCurrentUser();
+    if (!user) return reject(new Error("ログインしていません"));
+    user.getSession((err: Error | null) => {
+      if (err) return reject(err);
+      user.deleteUser((err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  });
+}
+
 export function getCurrentSession(): Promise<CognitoTokens | null> {
   return new Promise((resolve) => {
     const user = userPool.getCurrentUser();

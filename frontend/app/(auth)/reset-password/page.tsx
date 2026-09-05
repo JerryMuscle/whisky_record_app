@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { input } from "@/lib/styles";
 import * as cognito from "@/lib/cognito";
+import { AUTH_MESSAGES, translateCognitoError } from "@/lib/messages";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function ResetPasswordPage() {
       await cognito.forgotPassword(email);
       setStep("confirm");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "送信に失敗しました");
+      setError(translateCognitoError(err, AUTH_MESSAGES.RESET_REQUEST_FAILED));
     } finally {
       setSubmitting(false);
     }
@@ -37,7 +38,7 @@ export default function ResetPasswordPage() {
       await cognito.confirmForgotPassword(email, code, newPassword);
       router.push("/login");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "パスワードの再設定に失敗しました");
+      setError(translateCognitoError(err, AUTH_MESSAGES.RESET_CONFIRM_FAILED));
     } finally {
       setSubmitting(false);
     }

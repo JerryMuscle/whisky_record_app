@@ -34,6 +34,9 @@ export const getMe = (token: string) =>
 export const updateMe = (token: string, body: { username?: string; avatar_url?: string }) =>
   request<User>("/me", { method: "PUT", body: JSON.stringify(body) }, token);
 
+export const deleteMe = (token: string) =>
+  request<void>("/me", { method: "DELETE" }, token);
+
 // --- Bottles ---
 export const getBottles = (token: string) =>
   request<Bottle[]>("/bottles", {}, token);

@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Label from "@/components/Label";
 import { input } from "@/lib/styles";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateMe } from "@/lib/api";
+import { updateMe, deleteMe } from "@/lib/api";
+import * as cognito from "@/lib/cognito";
+import { PROFILE_MESSAGES, translateCognitoError } from "@/lib/messages";
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -18,7 +21,8 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 export default function SettingsPage() {
-  const { user, token, refreshUser } = useAuth();
+  const router = useRouter();
+  const { user, token, logout, refreshUser } = useAuth();
   const [username, setUsername] = useState(user?.username ?? "");
   const [profileError, setProfileError] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
@@ -27,6 +31,12 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   if (!user) return null;
 
@@ -38,19 +48,60 @@ export default function SettingsPage() {
     try {
       await updateMe(token, { username });
       await refreshUser();
-      setProfileSuccess("プロフィールを更新しました");
+      setProfileSuccess(PROFILE_MESSAGES.UPDATE_SUCCESS);
     } catch {
-      setProfileError("プロフィールの更新に失敗しました");
+      setProfileError(PROFILE_MESSAGES.UPDATE_FAILED);
     } finally {
       setSavingProfile(false);
     }
   }
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: Cognito連携
-    alert("パスワードを変更しました（Cognito連携は後で実装）");
-  };
+    setPasswordError("");
+    setPasswordSuccess("");
+    if (newPassword !== confirmPassword) {
+      setPasswordError(PROFILE_MESSAGES.NEW_PASSWORD_MISMATCH);
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await cognito.changePassword(currentPassword, newPassword);
+      setPasswordSuccess(PROFILE_MESSAGES.PASSWORD_CHANGE_SUCCESS);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setPasswordError(
+        translateCognitoError(err, PROFILE_MESSAGES.PASSWORD_CHANGE_FAILED, {
+          NotAuthorizedException: PROFILE_MESSAGES.CURRENT_PASSWORD_INCORRECT,
+        })
+      );
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  async function handleAccountDelete() {
+    if (!confirm(PROFILE_MESSAGES.DELETE_CONFIRM)) {
+      return;
+    }
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await deleteMe(token);
+      try {
+        await cognito.deleteUser();
+      } catch {
+        // DBのデータは削除済みのため続行する
+      }
+      logout();
+      router.push("/login");
+    } catch {
+      setDeleteError(PROFILE_MESSAGES.DELETE_FAILED);
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -149,12 +200,15 @@ export default function SettingsPage() {
               className={input}
             />
           </div>
+          {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
+          {passwordSuccess && <p className="text-sm text-emerald-600">{passwordSuccess}</p>}
           <div className="flex justify-end">
             <button
               type="submit"
-              className="rounded-lg bg-amber-800 px-5 py-2 text-sm font-medium text-white hover:bg-amber-900 transition"
+              disabled={savingPassword}
+              className="rounded-lg bg-amber-800 px-5 py-2 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
             >
-              パスワードを変更
+              {savingPassword ? "変更中..." : "パスワードを変更"}
             </button>
           </div>
         </form>
@@ -165,12 +219,14 @@ export default function SettingsPage() {
         <p className="text-sm text-stone-500">
           アカウントを削除すると、すべての記録データが完全に削除されます。この操作は取り消せません。
         </p>
+        {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
         <button
           type="button"
-          className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition"
-          onClick={() => alert("削除確認（API連携は後で実装）")}
+          disabled={deleting}
+          className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+          onClick={handleAccountDelete}
         >
-          アカウントを削除する
+          {deleting ? "削除中..." : "アカウントを削除する"}
         </button>
       </SectionCard>
     </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { input } from "@/lib/styles";
 import { useAuth } from "@/contexts/AuthContext";
+import { AUTH_MESSAGES, translateCognitoError } from "@/lib/messages";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function LoginPage() {
       await login(email, password);
       router.push("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "ログインに失敗しました");
+      setError(translateCognitoError(err, AUTH_MESSAGES.LOGIN_FAILED));
     } finally {
       setSubmitting(false);
     }

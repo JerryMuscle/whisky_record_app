@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { input } from "@/lib/styles";
 import { useAuth } from "@/contexts/AuthContext";
 import * as cognito from "@/lib/cognito";
+import { AUTH_MESSAGES, translateCognitoError } from "@/lib/messages";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     if (password !== passwordConfirm) {
-      setError("パスワードが一致しません");
+      setError(AUTH_MESSAGES.PASSWORD_MISMATCH);
       return;
     }
     setSubmitting(true);
@@ -31,7 +32,7 @@ export default function RegisterPage() {
       await cognito.signUp(email, password);
       setStep("confirm");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登録に失敗しました");
+      setError(translateCognitoError(err, AUTH_MESSAGES.REGISTER_FAILED));
     } finally {
       setSubmitting(false);
     }
@@ -46,7 +47,7 @@ export default function RegisterPage() {
       await login(email, password, username);
       router.push("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "確認コードが正しくありません");
+      setError(translateCognitoError(err, AUTH_MESSAGES.CONFIRM_CODE_INVALID));
     } finally {
       setSubmitting(false);
     }

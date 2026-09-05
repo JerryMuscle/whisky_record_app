@@ -50,3 +50,13 @@ def update_me(
         body.avatar_url: アバター画像の URL。
     """
     return user_service.update_user(db, current_user, body.username, body.avatar_url)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """ログイン中のユーザーを削除する。関連するボトル・テイスティング記録・フレーバータグも CASCADE 削除される。"""
+    user_service.delete_user(db, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

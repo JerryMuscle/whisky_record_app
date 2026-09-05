@@ -28,3 +28,9 @@ def update_user(db: Session, user: User, username: str | None, avatar_url: str |
     db.commit()
     db.refresh(user)
     return user
+
+
+def delete_user(db: Session, user: User) -> None:
+    """ユーザーを削除する。関連するボトル・テイスティング記録・フレーバータグも CASCADE 削除される。"""
+    db.delete(user)
+    db.commit()
