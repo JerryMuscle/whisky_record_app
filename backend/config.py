@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    DEV_MODE: bool = False
 
     COGNITO_REGION: str = "ap-northeast-1"
     COGNITO_USER_POOL_ID: str = ""

@@ -1,7 +1,33 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { input } from "@/lib/styles";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      router.push("/home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ログインに失敗しました");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="w-full max-w-md px-4">
       {/* ロゴ */}
@@ -16,7 +42,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-stone-200 px-8 py-10">
         <h2 className="text-lg font-semibold text-stone-800 mb-6">ログイン</h2>
 
-        <form className="space-y-5">
+        <form className="space-y-5" onSubmit={handleSubmit}>
           {/* メールアドレス */}
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-stone-700">
@@ -26,6 +52,9 @@ export default function LoginPage() {
               type="email"
               placeholder="you@example.com"
               className={input}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
           </div>
 
@@ -46,15 +75,21 @@ export default function LoginPage() {
               type="password"
               placeholder="••••••••"
               className={input}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
             />
           </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           {/* ログインボタン */}
           <button
             type="submit"
-            className="w-full rounded-lg bg-amber-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition"
+            disabled={submitting}
+            className="w-full rounded-lg bg-amber-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
           >
-            ログイン
+            {submitting ? "ログイン中..." : "ログイン"}
           </button>
         </form>
 

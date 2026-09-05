@@ -3,13 +3,8 @@
 import { useState } from "react";
 import Label from "@/components/Label";
 import { input } from "@/lib/styles";
-
-const MOCK_USER = {
-  username: "whisky_lover",
-  email: "user@example.com",
-  avatar_url: null,
-  created_at: "2026-01-15",
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { updateMe } from "@/lib/api";
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -23,16 +18,33 @@ function SectionCard({ title, children }: { title: string; children: React.React
 }
 
 export default function SettingsPage() {
-  const [username, setUsername] = useState(MOCK_USER.username);
+  const { user, token, refreshUser } = useAuth();
+  const [username, setUsername] = useState(user?.username ?? "");
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  if (!user) return null;
+
+  async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: API連携
-    alert("プロフィールを更新しました（API連携は後で実装）");
-  };
+    setProfileError("");
+    setProfileSuccess("");
+    setSavingProfile(true);
+    try {
+      await updateMe(token, { username });
+      await refreshUser();
+      setProfileSuccess("プロフィールを更新しました");
+    } catch {
+      setProfileError("プロフィールの更新に失敗しました");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,18 +64,20 @@ export default function SettingsPage() {
       <SectionCard title="プロフィール">
         <div className="flex items-center gap-5">
           <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-            {MOCK_USER.avatar_url ? (
-              <img src={MOCK_USER.avatar_url} alt="avatar" className="w-full h-full rounded-full object-cover" />
+            {user.avatar_url ? (
+              <img src={user.avatar_url} alt="avatar" className="w-full h-full rounded-full object-cover" />
             ) : (
               <span className="text-2xl text-amber-600">
-                {MOCK_USER.username.charAt(0).toUpperCase()}
+                {user.username.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
           <div>
-            <p className="text-sm font-medium text-stone-800">{MOCK_USER.username}</p>
-            <p className="text-xs text-stone-400">{MOCK_USER.email}</p>
-            <p className="text-xs text-stone-400 mt-1">登録日: {MOCK_USER.created_at}</p>
+            <p className="text-sm font-medium text-stone-800">{user.username}</p>
+            <p className="text-xs text-stone-400">{user.email}</p>
+            <p className="text-xs text-stone-400 mt-1">
+              登録日: {new Date(user.created_at).toLocaleDateString("ja-JP")}
+            </p>
           </div>
         </div>
 
@@ -75,24 +89,28 @@ export default function SettingsPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className={input}
+              required
             />
           </div>
           <div className="space-y-1.5">
             <Label>メールアドレス</Label>
             <input
               type="email"
-              value={MOCK_USER.email}
+              value={user.email}
               disabled
               className="w-full rounded-lg border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-stone-400 cursor-not-allowed"
             />
             <p className="text-xs text-stone-400">メールアドレスは変更できません</p>
           </div>
+          {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+          {profileSuccess && <p className="text-sm text-emerald-600">{profileSuccess}</p>}
           <div className="flex justify-end">
             <button
               type="submit"
-              className="rounded-lg bg-amber-800 px-5 py-2 text-sm font-medium text-white hover:bg-amber-900 transition"
+              disabled={savingProfile}
+              className="rounded-lg bg-amber-800 px-5 py-2 text-sm font-medium text-white hover:bg-amber-900 transition disabled:opacity-50"
             >
-              変更を保存
+              {savingProfile ? "保存中..." : "変更を保存"}
             </button>
           </div>
         </form>
